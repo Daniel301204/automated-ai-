@@ -1,49 +1,9 @@
-# AutoJob AI 2.0 — Windows / Streamlit
+# AutoJob AI — multi-user job review and application dashboard
 
-## Outcome previews
-1. Website: profile editor, job sources, application controls.
-2. Real public job discovery: Greenhouse and Lever listings filtered to India / remote; no scraping.
-3. AI matching: required-qualification eligibility and suitability score.
-4. Routing: one verified recruiter email or official ATS review URL.
-5. Execution: Gmail drafts or optional guarded Gmail sending only after explicit opt-in. Public ATS listing APIs **do not** authorize submission; no live ATS adapter is bundled.
-6. Operations: SQLite and CSV, daily Windows task, no duplicates for sent/drafted jobs.
+Upload a résumé, review extracted evidence, configure India/remote preferences, discover real vacancies and inspect similarity scores. Confirm mandatory eligibility and an employer-published application contact before preparing an email. Review the exact message and original PDF, then explicitly approve each send.
 
-## Safe installation
-Extract ZIP to a new directory. Open PowerShell in the extracted `job_agent_mvp` folder:
+The Streamlit dashboard supports private OIDC sign-in, tenant-isolated PostgreSQL records, per-user Gmail OAuth with encrypted tokens, daily attempt limits, duplicate-send protection and application tracking. An external scheduled discovery workflow finds jobs for opted-in users; it never sends applications.
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\safe_install.ps1 -TargetDirectory 'D:\LIBA course\new model\job_agent_mvp'
-Set-Location 'D:\LIBA course\new model\job_agent_mvp'
-& '.\.venv\Scripts\python.exe' -m pip install -r requirements.txt
-& '.\.venv\Scripts\python.exe' -m pytest -q
-& '.\.venv\Scripts\python.exe' agent.py --offline-demo
-& '.\.venv\Scripts\python.exe' -m streamlit run streamlit_app.py
-```
+**Implemented:** literal résumé evidence, public feeds, review and approval, Gmail transport, tracking and deployment configuration. **Requires external configuration:** public Streamlit deployment, PostgreSQL, Google OIDC/Gmail OAuth and scheduler credentials. **Not implemented:** automatic reply synchronization, OCR, authorized ATS submission integrations. ATS applications use the employer's official page. Similarity scores do not establish eligibility, and user confirmation does not guarantee employer acceptance.
 
-If no .venv exists, create one with `py -3 -m venv .venv` first. To try live job matching, configure `.env`, `profile.json`, and `boards.json` then run `agent.py --dry-run`. Only run without dry-run after OAuth/contacts review.
-
-### Limitations
-ATS submission: **not supplied** without employer-authorized integration and valid integration credentials. Resume PDF upload stores the file but does not automatically extract qualifications; verify `profile.json`. Recruiting replies are not automatically synchronized. Live integrations have not been tested with your accounts. Streamlit is local; background execution relies on Windows Task Scheduler.
-
-**Security**: backups may include credentials; keep them private. Never commit `.env` or OAuth tokens to source control. Never run tests in live-send mode.
-
-## Stage 2: Live Job Discovery — implemented
-The dashboard now has a **Live Job Discovery** page. Click **Fetch live vacancies now** to call
-public Greenhouse/Lever GET APIs and write `data/discovered_jobs.csv` and
-`data/discovery_report.json`. This action requires no OpenAI API key, Gmail OAuth,
-or sender authorization. It **never** sends applications. The results are limited
-to employer boards listed in `boards.json`, not the entire internet. The India +
-remote location filter is a search heuristic: remote jobs may have additional
-work-authorization or country restrictions that must be checked during matching.
-
-From PowerShell, independently run:
-
-```powershell
-Set-Location 'D:\LIBA course\new model\job_agent_mvp'
-& '.\.venv\Scripts\python.exe' agent.py --discover-only
-& '.\.venv\Scripts\python.exe' -m streamlit run streamlit_app.py
-```
-
-The upgrade installer copies the new `job_discovery.py` module. The existing
-`.env`, OAuth files, profile, contacts and database are preserved.
+See [deployment and validation instructions](DEPLOYMENT.md). Do not commit credentials, tokens or real résumés. Real delivery and hosted sign-in must be validated after account configuration; mocked tests do not prove them.

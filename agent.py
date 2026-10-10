@@ -199,6 +199,8 @@ def main():
     parser.add_argument("--offline-demo", action="store_true", help="Run matching on bundled synthetic posting without OpenAI/Gmail")
     args = parser.parse_args()
     load_dotenv(BASE / ".env")
+    if os.getenv("ENABLE_AUTO_SEND") == "1":
+        raise RuntimeError("Automatic sending is disabled. Review and approve each email in the dashboard.")
     DATA.mkdir(exist_ok=True)
     profile = config_json("profile.json")
     boards = config_json("boards.json")

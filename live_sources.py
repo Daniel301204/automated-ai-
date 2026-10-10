@@ -42,6 +42,9 @@ def _get_json(session,url,params=None):
 
 def fetch_public(query, boards=None, session=None, per_source=50, location_policy='india_remote'):
     """Return (list[normalized job], list[readable source errors])."""
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError('A search keyword is required')
+    query = query.strip()
     session = session or requests.Session()
     jobs, errors = [], []
     try:
@@ -54,7 +57,7 @@ def fetch_public(query, boards=None, session=None, per_source=50, location_polic
                 url=j.get('applicationLink') or j.get('url') or j.get('guid') or ''
                 if str(url).startswith('https://'):
                     jobs.append(dict(job_id='himalayas:'+str(j.get('guid') or j.get('id') or url), title=j.get('title',''), company=j.get('companyName',''), location=location, source='Himalayas', url=url, description=text(j.get('description')), location_status=location_assessment(location,j.get('worldwide',False)), posted=str(j.get('pubDate',''))))
-    except (requests.RequestException,ValueError,TypeError,AttributeError) as e:
+    except (requests.RequestException,ValueError,TypeError,AttributeError,KeyError) as e:
         errors.append('Himalayas: '+str(e)[:180])
     try:
         payload=_get_json(session,'https://remotive.com/api/remote-jobs',{'search':query,'limit':per_source})
@@ -64,7 +67,7 @@ def fetch_public(query, boards=None, session=None, per_source=50, location_polic
                 url=j.get('url','')
                 if str(url).startswith('https://'):
                     jobs.append(dict(job_id='remotive:'+str(j.get('id',url)),title=j.get('title',''),company=j.get('company_name',''),location=location, source='Remotive',url=url,description=text(j.get('description')),location_status=location_assessment(location),posted=str(j.get('publication_date',''))))
-    except (requests.RequestException, ValueError,TypeError,AttributeError) as e:
+    except (requests.RequestException, ValueError,TypeError,AttributeError,KeyError) as e:
         errors.append('Remotive: '+str(e)[:180])
     for source in ('greenhouse','lever'):
         for board in (boards or {}).get(source,[]):
@@ -83,10 +86,15 @@ def fetch_public(query, boards=None, session=None, per_source=50, location_polic
                         title=j.get('text','');link=j.get('hostedUrl','');desc=text(j.get('descriptionPlain') or j.get('description'))
                     if not link.startswith('https://') or not good_location(location,location_policy): continue
                     jobs.append(dict(job_id=f'{source}:{board}:{j.get("id",link)}', title=title,company=board,location=location,source=source.title(),url=link,description=desc,posted=''))
-            except (requests.RequestException,ValueError,TypeError,AttributeError) as e:
+            except (requests.RequestException,ValueError,TypeError,AttributeError,KeyError) as e:
                 errors.append(f'{source}/{board}: {str(e)[:170]}')
     seen={}
     for j in jobs:
+        # Some feeds ignore search parameters; apply the same local keyword filter to every source.
+        words = re.findall(r'[a-z0-9]+', query.casefold())
+        haystack = (j.get('title', '') + ' ' + j.get('description', '')).casefold()
+        if words and not all(re.search(r'(?<![a-z0-9])' + re.escape(w) + r'(?![a-z0-9])', haystack) for w in words):
+            continue
         if j['url'] not in seen:
             j.setdefault('location_status', location_assessment(j.get('location','')))
             seen[j['url']]=j

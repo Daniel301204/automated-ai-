@@ -13,3 +13,4 @@ __pycache__/
 *.docx
 resume_text.txt
 *.db
+.streamlit/secrets.toml
