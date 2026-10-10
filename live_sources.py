@@ -40,36 +40,41 @@ def _get_json(session,url,params=None):
     r.raise_for_status()
     return r.json()
 
-def fetch_public(query, boards=None, session=None, per_source=50, location_policy='india_remote'):
+def fetch_public(query, boards=None, session=None, per_source=50, location_policy='india_remote', enabled_sources=None):
     """Return (list[normalized job], list[readable source errors])."""
     if not isinstance(query, str) or not query.strip():
         raise ValueError('A search keyword is required')
     query = query.strip()
     session = session or requests.Session()
     jobs, errors = [], []
-    try:
-        payload=_get_json(session,'https://himalayas.app/jobs/api/search',{'q':query,'sort':'recent','page':1})
-        for j in payload.get('jobs', [])[:per_source]:
-            restriction=j.get('locationRestrictions') or j.get('location') or []
-            if isinstance(restriction,list): restriction=', '.join(str(x.get('name',x) if isinstance(x,dict) else x) for x in restriction)
-            location=restriction or ('Worldwide remote' if j.get('worldwide') else 'Remote — check location restrictions')
-            if good_location(location,location_policy,j.get('worldwide',False)):
-                url=j.get('applicationLink') or j.get('url') or j.get('guid') or ''
-                if str(url).startswith('https://'):
-                    jobs.append(dict(job_id='himalayas:'+str(j.get('guid') or j.get('id') or url), title=j.get('title',''), company=j.get('companyName',''), location=location, source='Himalayas', url=url, description=text(j.get('description')), location_status=location_assessment(location,j.get('worldwide',False)), posted=str(j.get('pubDate',''))))
-    except (requests.RequestException,ValueError,TypeError,AttributeError,KeyError) as e:
-        errors.append('Himalayas: '+str(e)[:180])
-    try:
-        payload=_get_json(session,'https://remotive.com/api/remote-jobs',{'search':query,'limit':per_source})
-        for j in payload.get('jobs',[])[:per_source]:
-            location=j.get('candidate_required_location','Worldwide remote')
-            if good_location(location,location_policy):
-                url=j.get('url','')
-                if str(url).startswith('https://'):
-                    jobs.append(dict(job_id='remotive:'+str(j.get('id',url)),title=j.get('title',''),company=j.get('company_name',''),location=location, source='Remotive',url=url,description=text(j.get('description')),location_status=location_assessment(location),posted=str(j.get('publication_date',''))))
-    except (requests.RequestException, ValueError,TypeError,AttributeError,KeyError) as e:
-        errors.append('Remotive: '+str(e)[:180])
+    sources = set(enabled_sources if enabled_sources is not None else ('Himalayas', 'Remotive', 'Greenhouse', 'Lever'))
+    if 'Himalayas' in sources:
+        try:
+            payload=_get_json(session,'https://himalayas.app/jobs/api/search',{'q':query,'sort':'recent','page':1})
+            for j in payload.get('jobs', [])[:per_source]:
+                restriction=j.get('locationRestrictions') or j.get('location') or []
+                if isinstance(restriction,list): restriction=', '.join(str(x.get('name',x) if isinstance(x,dict) else x) for x in restriction)
+                location=restriction or ('Worldwide remote' if j.get('worldwide') else 'Remote — check location restrictions')
+                if good_location(location,location_policy,j.get('worldwide',False)):
+                    url=j.get('applicationLink') or j.get('url') or j.get('guid') or ''
+                    if str(url).startswith('https://'):
+                        jobs.append(dict(job_id='himalayas:'+str(j.get('guid') or j.get('id') or url), title=j.get('title',''), company=j.get('companyName',''), location=location, source='Himalayas', url=url, description=text(j.get('description')), location_status=location_assessment(location,j.get('worldwide',False)), posted=str(j.get('pubDate',''))))
+        except (requests.RequestException,ValueError,TypeError,AttributeError,KeyError) as e:
+            errors.append('Himalayas: '+str(e)[:180])
+    if 'Remotive' in sources:
+        try:
+            payload=_get_json(session,'https://remotive.com/api/remote-jobs',{'search':query,'limit':per_source})
+            for j in payload.get('jobs',[])[:per_source]:
+                location=j.get('candidate_required_location','Worldwide remote')
+                if good_location(location,location_policy):
+                    url=j.get('url','')
+                    if str(url).startswith('https://'):
+                        jobs.append(dict(job_id='remotive:'+str(j.get('id',url)),title=j.get('title',''),company=j.get('company_name',''),location=location, source='Remotive',url=url,description=text(j.get('description')),location_status=location_assessment(location),posted=str(j.get('publication_date',''))))
+        except (requests.RequestException, ValueError,TypeError,AttributeError,KeyError) as e:
+            errors.append('Remotive: '+str(e)[:180])
     for source in ('greenhouse','lever'):
+        if source.title() not in sources:
+            continue
         for board in (boards or {}).get(source,[]):
             if not isinstance(board,str) or not re.fullmatch(r'[A-Za-z0-9_-]+',board):
                 errors.append(f'{source}: invalid board token'); continue

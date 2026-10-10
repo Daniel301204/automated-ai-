@@ -4,12 +4,13 @@ import hashlib
 import io
 import json
 import re
+import uuid
 from datetime import datetime, timezone
 from email.message import EmailMessage
 
 import requests
 from sqlalchemy import (create_engine, MetaData, Table, Column, String, Text,
-                        LargeBinary, select, update, and_)
+                        LargeBinary, Boolean, select, update, and_)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import make_url
 from resume_match import skills_in
@@ -73,7 +74,32 @@ class Store:
             Column('payload', Text, nullable=False), Column('status', String(40), nullable=False),
             Column('application', Text), Column('attachment', LargeBinary),
             Column('reserved_day', String(10)), Column('message_id', Text))
+        self.loops = Table('autojob_loops', metadata,
+            Column('tenant', String(64), primary_key=True), Column('loop_id', String(32), primary_key=True),
+            Column('config', Text, nullable=False), Column('enabled', Boolean, nullable=False),
+            Column('created_at', String(40), nullable=False))
         metadata.create_all(self.engine)
+
+    def save_loop(self, tenant, config, enabled=False, loop_id=None):
+        from loops import normalize_loop
+        config = normalize_loop(config)
+        self.ensure_user(tenant)
+        loop_id = loop_id or uuid.uuid4().hex
+        with self.engine.begin() as conn:
+            key = and_(self.loops.c.tenant == tenant, self.loops.c.loop_id == loop_id)
+            if conn.execute(select(self.loops.c.loop_id).where(key)).first():
+                conn.execute(update(self.loops).where(key).values(config=json.dumps(config), enabled=bool(enabled)))
+            else:
+                conn.execute(self.loops.insert().values(tenant=tenant, loop_id=loop_id, config=json.dumps(config), enabled=bool(enabled), created_at=datetime.now(timezone.utc).isoformat()))
+        return loop_id
+
+    def list_loops(self, tenant):
+        with self.engine.connect() as conn:
+            return [dict(r) for r in conn.execute(select(self.loops).where(self.loops.c.tenant == tenant).order_by(self.loops.c.created_at)).mappings()]
+
+    def set_loop_enabled(self, tenant, loop_id, enabled):
+        with self.engine.begin() as conn:
+            conn.execute(update(self.loops).where(and_(self.loops.c.tenant == tenant, self.loops.c.loop_id == loop_id)).values(enabled=bool(enabled)))
 
     def ensure_user(self, tenant):
         try:
@@ -138,13 +164,14 @@ class Store:
             if row['status'] != 'needs_review' or row['reserved_day']:
                 raise ValueError('Already attempted or not awaiting approval')
             app = json.loads(row['application'])
+            daily_limit = min(daily_limit, int(app.get('loop_limit', 5)))
             if not app.get('requirements_verified') or not app.get('contact_verified') or not app.get('profile_verified'):
                 raise ValueError('Eligibility, profile and recipient must be verified')
             if app.get('resume_digest') != hashlib.sha256((user['resume_text'] or '').encode()).hexdigest():
                 raise ValueError('Résumé changed: prepare and review again')
             if bytes(user['resume'] or b'') != bytes(row['attachment']):
                 raise ValueError('Original PDF changed: prepare and review again')
-            if app.get('score', 0) < max(80, int(profile.get('threshold', 80))):
+            if app.get('score', 0) < max(80, int(profile.get('threshold', 80)), int(app.get('loop_threshold', 80))):
                 raise ValueError('Match is below your application threshold')
             expected = approval_digest(app['to'], app['subject'], app['body'], row['attachment'])
             if digest != expected:

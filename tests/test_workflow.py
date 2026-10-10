@@ -154,7 +154,7 @@ def test_all_pages_render_in_explicit_local_mode(monkeypatch, tmp_path):
     monkeypatch.setenv('AUTOJOB_DATABASE_URL', 'sqlite:///' + str(tmp_path / 'ui.db'))
     from streamlit.testing.v1 import AppTest
     app = AppTest.from_file(Path(__file__).resolve().parents[1] / 'streamlit_app.py').run(timeout=20)
-    for page in ['Find jobs', 'My résumé', 'Settings', 'Review & approve', 'Tracking']:
+    for page in ['Overview', 'My loops', 'Board', 'All Matches', 'Search Jobs', 'My Applications', 'Questions', 'CV Checker', 'CV Builder', 'Inbox', 'Personal Info']:
         app.sidebar.radio[0].set_value(page).run(timeout=20)
         assert not app.exception, (page, app.exception)
 
@@ -246,9 +246,93 @@ def test_prepared_application_ui_requires_final_approval(monkeypatch, tmp_path):
     monkeypatch.setenv('AUTOJOB_DATABASE_URL', url)
     from streamlit.testing.v1 import AppTest
     app = AppTest.from_file(Path(__file__).resolve().parents[1] / 'streamlit_app.py').run(timeout=20)
-    app.sidebar.radio[0].set_value('Review & approve').run(timeout=20)
+    app.sidebar.radio[0].set_value('My Applications').run(timeout=20)
     assert not app.exception
     send = next(b for b in app.button if b.label == 'Approve and send this email')
     assert send.disabled
     assert any('exact email' in c.label for c in app.checkbox)
     assert any('Gmail OAuth' in item.value for item in app.info)
+
+
+def test_loop_wizard_saves_real_private_configuration(monkeypatch, tmp_path):
+    url = 'sqlite:///' + str(tmp_path / 'wizard.db')
+    monkeypatch.setenv('AUTOJOB_LOCAL_DEV', '1')
+    monkeypatch.setenv('AUTOJOB_DATABASE_URL', url)
+    from streamlit.testing.v1 import AppTest
+    app = AppTest.from_file(Path(__file__).resolve().parents[1] / 'streamlit_app.py').run(timeout=20)
+    def field(kind, label):
+        return next(w for w in getattr(app, kind) if w.label == label)
+    field('button', 'Continue').click().run()
+    assert app.error and app.session_state.wizard_step == 0
+    field('text_input', 'Job Titles').set_value('Financial analyst')
+    field('multiselect', 'Search in Specific Job Boards').set_value(['Remotive'])
+    field('button', 'Continue').click().run()
+    assert app.session_state.wizard_step == 1
+    field('text_input', 'Email Subject').set_value('Application — {job_title}')
+    field('button', 'Continue').click().run()
+    assert app.session_state.wizard_step == 2
+    field('text_input', 'Loop Name').set_value('My finance search')
+    field('number_input', 'Minimum application match (%)').set_value(90)
+    field('button', 'Continue').click().run()
+    assert app.session_state.wizard_step == 3
+    field('button', 'Create Loop').click().run()
+    assert not app.exception
+    assert app.session_state.active_page == 'My loops'
+    value = Store(url)
+    rows = value.list_loops('local-development')
+    assert len(rows) == 1 and rows[0]['enabled'] is False
+    config = json.loads(rows[0]['config'])
+    assert config['name'] == 'My finance search' and config['threshold'] == 90
+    assert config['sources'] == ['Remotive']
+    assert value.list_loops('another-user') == []
+    value.set_loop_enabled('another-user', rows[0]['loop_id'], True)
+    assert value.list_loops('local-development')[0]['enabled'] is False
+
+
+def test_selected_sources_do_not_call_other_providers():
+    session = Mock()
+    response = Mock()
+    response.json.return_value = {'jobs': []}
+    session.get.return_value = response
+    jobs, errors = fetch_public('analyst', session=session, enabled_sources=['Remotive'])
+    assert jobs == [] and errors == []
+    session.get.assert_called_once()
+    assert session.get.call_args.args[0] == 'https://remotive.com/api/remote-jobs'
+
+
+def test_email_templates_cannot_invent_nested_fields():
+    from loops import validate_template, email_preview
+    for template in ['{name.__class__}', '{name[0]}', '{unsupported}', '{name!r}', '{name:>10000000}', '{']:
+        with pytest.raises(ValueError):
+            validate_template(template)
+    subject, body = email_preview({}, dict(title='Analyst',company='Example',url='https://example.org'), 'Candidate')
+    assert 'Candidate' in subject and 'Analyst' in body
+    assert 'years' not in body
+
+
+def test_scheduler_runs_enabled_saved_loops_without_sending(store):
+    from scheduled_discovery import run
+    from loops import LOCATIONS
+    config = dict(query='analyst', location=LOCATIONS[0], sources=['Remotive'])
+    loop_id = store.save_loop('alice', config, enabled=True)
+    store.save_loop('alice', dict(config, query='engineer'), enabled=False)
+    fetcher = Mock(return_value=([dict(job_id='loop-job', title='Analyst', company='Example', location='India', description='Analyst')], []))
+    assert run(store, fetcher) == 0
+    fetcher.assert_called_once()
+    assert fetcher.call_args.kwargs['enabled_sources'] == ['Remotive']
+    row = store.list_jobs('alice')[0]
+    assert row['status'] == 'discovered'
+    assert json.loads(row['payload'])['loop_id'] == loop_id
+    assert store.list_jobs('bob') == []
+
+
+def test_loop_threshold_is_checked_again_at_dispatch(store):
+    digest = prepared(store)
+    row = store.job('alice', 'job1')
+    app = json.loads(row['application'])
+    app['loop_threshold'] = 95
+    store.prepare('alice', 'job1', app, bytes(row['attachment']))
+    sender = Mock()
+    with pytest.raises(ValueError, match='threshold'):
+        store.send_approved('alice', 'job1', digest, {}, sender=sender)
+    sender.assert_not_called()
