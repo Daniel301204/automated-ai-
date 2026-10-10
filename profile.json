@@ -1,0 +1,12 @@
+{
+  "full_name": "Sample Candidate",
+  "email": "candidate@example.com",
+  "education": ["MSc Quantitative Finance (in progress)"],
+  "skills": ["Python", "Excel", "Financial modelling", "Statistics", "Power BI"],
+  "experience_years": 0,
+  "experience_summary": "Academic projects in portfolio optimisation and financial analysis.",
+  "desired_roles": ["financial analyst", "quantitative analyst", "risk analyst", "data analyst", "intern"],
+  "preferred_locations": ["India", "Remote"],
+  "work_authorization": "India",
+  "resume_path": "resume.pdf"
+}

@@ -1,0 +1,15 @@
+.env
+credentials.json
+token.json
+profile.json
+approved_contacts.json
+resume.pdf
+data/*
+!data/.gitkeep
+__pycache__/
+.pytest_cache/
+.venv/
+*.pdf
+*.docx
+resume_text.txt
+*.db

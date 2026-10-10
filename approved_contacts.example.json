@@ -1,0 +1,7 @@
+{
+  "example-company": {
+    "email": "jobs@example.com",
+    "verified": false,
+    "notes": "Replace with a recruiter/application address confirmed by an official employer source. Set verified true only after checking."
+  }
+}
