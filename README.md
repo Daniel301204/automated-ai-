@@ -20,3 +20,5 @@ Desktop previews use unsaved example data:
 - [Personal Info](docs/ui/personal-info.png)
 
 The existing `AUTOJOB_` development variables and `autojob_` database table names are retained for compatibility. Never enable local development mode on a public host.
+
+After Community Cloud deployment, **Share app** in the sidebar offers a copyable public URL and a **Share on WhatsApp** link. It uses the configured sign-in redirect's public origin, with no résumé or OAuth details in the shared link. Each friend signs in separately. Local preview instead explains how to publish; it cannot provide a public localhost link.

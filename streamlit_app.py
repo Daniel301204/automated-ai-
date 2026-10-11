@@ -12,7 +12,7 @@ from live_sources import fetch_public
 from resume_match import read_resume, score
 from workflow import Store, evidence_profile, approval_digest
 from loops import SOURCES, LOCATIONS, SUBJECT, BODY, normalize_loop, validate_template, email_preview, discover_loop
-from looping_ui import theme, sidebar, header, stepper, empty, go
+from looping_ui import theme, sidebar, header, stepper, empty, go, public_share_url
 
 st.set_page_config(page_title='LoopingCV', page_icon='↻', layout='wide')
 theme()
@@ -90,7 +90,8 @@ if not local and secret('gmail_oauth') and secret('token_encryption_key'):
         st.error('Gmail connection configuration is unavailable. Email sending is disabled.')
 
 st.session_state.setdefault('active_page', 'New Loop')
-sidebar()
+auth_settings = secret('auth', {}) if not local else {}
+sidebar(public_share_url(auth_settings.get('redirect_uri')))
 page = st.session_state.active_page
 header(page, local)
 if not local and st.sidebar.button('Sign out'):
@@ -479,7 +480,10 @@ elif page == 'My Applications':
                 digest = approval_digest(app['to'], app['subject'], app['body'], bytes(row['attachment']))
                 approved = st.checkbox('I approve sending this exact email and PDF to this recipient now.', key='approval_' + digest)
                 if not gmail:
-                    st.info('Your Gmail OAuth connection is not configured. Sending remains disabled.')
+                    if local:
+                        st.info('Email sending is disabled in local preview. Publish the authenticated app with PostgreSQL, then connect your Gmail in Personal Info → Account Settings. Every email requires your approval.')
+                    else:
+                        st.info('Connect your Gmail in Personal Info → Account Settings before sending. The owner must configure Google OAuth if the connection option is unavailable.')
                 if st.button('Approve and send this email', key='send_' + digest, disabled=not (approved and gmail)):
                     try:
                         store.send_approved(tenant, job['job_id'], digest, gmail, int(profile.get('daily_limit', 3)))

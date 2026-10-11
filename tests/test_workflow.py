@@ -251,7 +251,7 @@ def test_prepared_application_ui_requires_final_approval(monkeypatch, tmp_path):
     send = next(b for b in app.button if b.label == 'Approve and send this email')
     assert send.disabled
     assert any('exact email' in c.label for c in app.checkbox)
-    assert any('Gmail OAuth' in item.value for item in app.info)
+    assert any('Email sending is disabled in local preview' in item.value for item in app.info)
 
 
 def test_loop_wizard_saves_real_private_configuration(monkeypatch, tmp_path):

@@ -1,5 +1,7 @@
 """LoopingCV presentation: screenshot-inspired shell and accessible native widgets."""
 import html
+import re
+from urllib.parse import quote, urlsplit
 import streamlit as st
 
 PAGES = ['Overview', 'My loops', 'Board', 'All Matches', 'Search Jobs', 'My Applications', 'Questions', 'CV Checker', 'CV Builder', 'Inbox', 'Personal Info']
@@ -112,7 +114,23 @@ def logo():
     st.markdown('''<div class="lc-logo"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 22A16 16 0 0 1 35 12" fill="none" stroke="#202020" stroke-width="5"/><path d="M35 5v13H22" fill="#202020"/><path d="M40 27A16 16 0 0 1 13 37" fill="none" stroke="#202020" stroke-width="5"/><path d="M13 44V31h13" fill="#202020"/></svg><span>loopingcv</span></div>''', unsafe_allow_html=True)
 
 
-def sidebar():
+def public_share_url(redirect_uri):
+    """Return only the public Community Cloud origin, without OAuth data."""
+    if not isinstance(redirect_uri, str):
+        return None
+    try:
+        parsed = urlsplit(redirect_uri.strip())
+        host = parsed.hostname or ''
+        if (parsed.scheme != 'https' or parsed.username or parsed.password
+                or parsed.port not in (None, 443)
+                or not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.streamlit\.app', host)):
+            return None
+        return 'https://' + host + '/'
+    except ValueError:
+        return None
+
+
+def sidebar(public_url=None):
     with st.sidebar:
         if st.session_state.get('sidebar_hidden'):
             st.button('Close navigation', on_click=lambda: st.session_state.update(sidebar_hidden=False))
@@ -124,6 +142,15 @@ def sidebar():
             st.button('＋ New Loop', type='primary', on_click=go, args=('New Loop',), key='sidebar_new', use_container_width=True)
             st.button('ⓘ Help - FAQ', on_click=go, args=('Questions',), use_container_width=True)
             st.button('♙ Personal Info', on_click=go, args=('Personal Info',), use_container_width=True)
+            with st.popover('Share app', use_container_width=True):
+                if public_url:
+                    st.caption('Your friends sign in to their own private workspace.')
+                    st.code(public_url, language=None)
+                    message = 'Try LoopingCV for job search and application review: ' + public_url
+                    st.link_button('Share on WhatsApp', 'https://wa.me/?text=' + quote(message, safe=''))
+                else:
+                    st.info('Publish LoopingCV on Streamlit Community Cloud to get a link your friends can open. Configure the public Google sign-in redirect in Streamlit Secrets. A localhost address is only available on your computer.')
+                    st.link_button('Open Streamlit Community Cloud', 'https://share.streamlit.io/')
             st.caption('English · Private workspace')
 
 
