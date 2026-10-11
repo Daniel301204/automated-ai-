@@ -6,14 +6,26 @@ The current project is a working, explainable prototype. It is not a trained lan
 
 ## What you need to do to get a shareable link
 
-1. Open [Streamlit Community Cloud](https://share.streamlit.io/), connect GitHub and create an app. Select repository **Daniel301204/automated-ai-**, branch **codex/approval-gated-streamlit**, main file **streamlit_app.py**, and **Python 3.12**. Choose the available app address you want. Streamlit assigns the actual HTTPS URL; no public deployment has been created by this workspace. Share that public URL in the chat so the next configuration can use the right redirects.
+1. Open [Streamlit Community Cloud](https://share.streamlit.io/) and manage your existing app at **https://5dasesqq5hdkocoz5dupwp.streamlit.app/**. Confirm repository **Daniel301204/automated-ai-**, branch **codex/approval-gated-streamlit**, main file **streamlit_app.py**, and **Python 3.12**. The owner created this deployment; its private configuration remains pending.
 2. Create a managed PostgreSQL database, for example through [Neon](https://console.neon.tech/). Keep the connection string private. The app requires `postgresql+psycopg://` and verified TLS; see DEPLOYMENT.md for the URL format. Database credentials go in Streamlit Secrets, not chat, Git or PowerShell source files.
-3. In [Google Cloud Console](https://console.cloud.google.com/), create an OAuth Web application client and enable the Gmail API. Register **both** `https://YOUR_ACTUAL_APP.streamlit.app/oauth2callback` and `https://YOUR_ACTUAL_APP.streamlit.app/`. Set the authorized origin to the same HTTPS app origin. Configure the consent screen and add yourself and demo friends as test users while it is in testing.
-4. In your Streamlit app settings, copy [.streamlit/secrets.example.toml](.streamlit/secrets.example.toml) into the private **Secrets** editor. Replace all placeholders with your actual database, Google and encryption settings. Generate the two private random keys on your computer with the commands below. Save the secrets and restart the app. Leave local development mode disabled on the public app.
+3. In [Google Cloud Console](https://console.cloud.google.com/), create an OAuth Web application client and enable the Gmail API. Register **both** `https://5dasesqq5hdkocoz5dupwp.streamlit.app/oauth2callback` and `https://5dasesqq5hdkocoz5dupwp.streamlit.app/`. Set the authorized origin to `https://5dasesqq5hdkocoz5dupwp.streamlit.app`. Configure the consent screen and add yourself and demo friends as test users while it is in testing.
+4. Run **CONFIGURE_STREAMLIT.bat** as explained below. In your Streamlit app settings, paste the prepared settings into the private **Secrets** editor. For manual setup, use [.streamlit/secrets.example.toml](.streamlit/secrets.example.toml) and replace all placeholders privately. Save the secrets and restart the app. Leave local development mode disabled on the public app.
 5. Open the public URL. Check sign-in, résumé persistence after a restart and isolation between two test accounts. Each account connects its own Gmail in **Personal Info → Account Settings**. Review the exact message, contact evidence and PDF before approving any real email. Check Gmail Sent and the application's awaiting_response status. These live deployment checks are still pending.
 6. Open **Share app → Share on WhatsApp** to invite friends. The shared link contains only the public app address. For daily discovery, add the same PostgreSQL URL privately as the GitHub Actions secret `AUTOJOB_DATABASE_URL` and ensure the discovery workflow is on the repository's default branch. The schedule is approximately **08:30 India time**, subject to GitHub scheduling delays; discovery never sends an application.
 
-Generate the encryption key and cookie secret in PowerShell, from the source folder after running the Windows launcher:
+After creating the database and Google OAuth Web client, **double-click CONFIGURE_STREAMLIT.bat** in the extracted source folder. This helper uses Python's standard library, so no additional package installation is required. It asks for your credentials locally, generates the cookie/encryption keys, fills both callback URLs, creates the ignored `.streamlit/secrets.toml` file and copies its contents to your clipboard. Paste only into your Streamlit app's private **Secrets** editor, save and restart.
+
+Database and Google secret inputs are hidden. The helper never prints them or uploads them. If a private settings file already exists, the helper stops without overwriting it or changing the keys. Keep that file out of Git and shared ZIPs. The Python helper is tested; the Windows wrapper still needs its first run on your laptop.
+
+The helper accepts a provider connection string and enforces certificate/hostname verification. A provider using a public certificate authority works with the default system trust store. If your provider supplies a private CA, its certificate must be available at the configured path on the hosted server; the helper preserves that setting. It does not create accounts, test a live database connection or save settings into your Streamlit account.
+
+You can also start it from PowerShell:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\CONFIGURE_STREAMLIT.ps1
+```
+
+For manual setup, generate the encryption key and cookie secret in PowerShell, from the source folder after running the Windows launcher:
 
 ```powershell
 .\.venv\Scripts\python.exe -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
