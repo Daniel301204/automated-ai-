@@ -2,6 +2,8 @@
 
 This is a multi-user review application. It requires OIDC sign-in and durable PostgreSQL storage before accepting uploads. Each user's résumé, settings, jobs and email connection are isolated by their identity-provider user ID. No shared Gmail sender is used. Public job content and matching do not require OpenAI.
 
+With sign-in or database settings missing, the hosted entrypoint shows a read-only public demo using the shipped fictional résumé and two fictional roles. The demo calls the real keyword matcher, but opens no private database, accepts no uploads and has no email transport. It stops before initializing any private workspace. Expand **Owner setup: enable private workspaces** to complete configuration. When both settings are supplied, sign-in remains mandatory.
+
 ## What works, and what still requires setup
 
 - PDF/DOCX/TXT text extraction, literal education/experience evidence and recognized skills; candidate preferences are entered manually. Scanned PDFs require separate OCR.

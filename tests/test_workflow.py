@@ -145,8 +145,9 @@ def test_hosted_app_does_not_expose_data_without_configuration(monkeypatch):
     from streamlit.testing.v1 import AppTest
     app = AppTest.from_file(Path(__file__).resolve().parents[1] / 'streamlit_app.py').run(timeout=20)
     assert not app.exception
-    assert 'setup' in app.title[0].value.lower()
+    assert 'Public demo' in app.info[0].value
     assert not app.get('file_uploader')
+    assert next(button for button in app.button if 'Approve and send' in button.label).disabled
 
 
 def test_all_pages_render_in_explicit_local_mode(monkeypatch, tmp_path):

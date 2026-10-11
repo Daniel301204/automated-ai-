@@ -10,6 +10,8 @@ See [deployment and validation instructions](DEPLOYMENT.md). Do not commit crede
 
 For the capstone demonstration, public hosting steps, current feature boundaries and presentation, see [CAPSTONE_LAUNCH.md](CAPSTONE_LAUNCH.md).
 
+Before hosted sign-in and PostgreSQL are configured, the app displays a public demo with shipped fictional résumé/job examples and an interactive keyword matcher. It accepts no uploads, opens no private database and cannot send emails. Owner setup instructions remain available in an expander. Once both required settings are present, the private sign-in flow resumes.
+
 For private hosting configuration on Windows, run `CONFIGURE_STREAMLIT.bat` after creating your PostgreSQL database and Google OAuth Web client. It prepares the secrets locally and copies them for you to paste into Streamlit's private Secrets editor. It preserves existing settings and never prints database/client secret values.
 
 To view and develop the dashboard on your own computer, follow [LOCAL_RUN.md](LOCAL_RUN.md). On Windows, install Python 3.12, extract the source and run `RUN_LOOPINGCV.bat`. The launcher opens a local workspace with email sending disabled.

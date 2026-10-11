@@ -2,7 +2,7 @@
 
 The current project is a working, explainable prototype. It is not a trained language model. It extracts literal résumé evidence, compares skills/keywords, discovers actual listings and prepares user-reviewed applications. Tests demonstrate specific behaviors; they do not establish matching accuracy or guarantee a bug-free service.
 
-**Your public app URL:** https://5dasesqq5hdkocoz5dupwp.streamlit.app/ — created by the owner; private sign-in and database configuration remain pending. The setup page is a configuration gate, not a completed workflow demo.
+**Your public app URL:** https://5dasesqq5hdkocoz5dupwp.streamlit.app/ — created by the owner; private sign-in and database configuration remain pending. The latest code displays a public demo using clearly labeled fictional examples when required settings are missing. It accepts no résumé uploads, accesses no private database and sends no emails. This is a demonstration, not the completed private workflow. The hosted URL still needs live validation after Streamlit updates the deployment.
 
 ## What you need to do to get a shareable link
 
