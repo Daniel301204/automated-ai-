@@ -1,0 +1,9 @@
+DEMONSTRATION DATA: fictional candidate; not a real application résumé.
+
+Demo Candidate
+Chennai, India
+B.Tech Computer Science, Example Institute, 2024
+Developer internship at Example Company, 2025
+Skills: Python, SQL, Streamlit, Git
+
+These fictional details illustrate extraction and matching only.

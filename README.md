@@ -8,6 +8,8 @@ The Streamlit dashboard supports private OIDC sign-in, tenant-isolated PostgreSQ
 
 See [deployment and validation instructions](DEPLOYMENT.md). Do not commit credentials, tokens or real résumés. Real delivery and hosted sign-in must be validated after account configuration; mocked tests do not prove them.
 
+For the capstone demonstration, public hosting steps, current feature boundaries and presentation, see [CAPSTONE_LAUNCH.md](CAPSTONE_LAUNCH.md).
+
 To view and develop the dashboard on your own computer, follow [LOCAL_RUN.md](LOCAL_RUN.md). On Windows, install Python 3.12, extract the source and run `RUN_LOOPINGCV.bat`. The launcher opens a local workspace with email sending disabled.
 
 ## LoopingCV interface

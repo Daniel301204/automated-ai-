@@ -15,7 +15,23 @@ def read_resume(filename,raw):
         return '\n'.join(page.extract_text() or '' for page in reader.pages)
     if ext=='docx':
         from docx import Document
-        return '\n'.join(p.text for p in Document(io.BytesIO(raw)).paragraphs)
+        from docx.text.paragraph import Paragraph
+
+        def document_lines(container):
+            for block in container.iter_inner_content():
+                if isinstance(block, Paragraph):
+                    yield block.text
+                else:
+                    # Résumés often put skills and employment history in tables.
+                    # Read cells in document order, without duplicating merged cells.
+                    seen = set()
+                    for row in block.rows:
+                        for cell in row.cells:
+                            if cell._tc not in seen:
+                                seen.add(cell._tc)
+                                yield from document_lines(cell)
+
+        return '\n'.join(document_lines(Document(io.BytesIO(raw))))
     raise ValueError('Upload a PDF, DOCX or TXT résumé')
 
 def terms(s):
@@ -23,15 +39,16 @@ def terms(s):
 
 def skills_in(s):
     lowered=' '+re.sub(r'\s+',' ',s.lower())+' '
-    return {x for x in SKILLS if re.search(r'(?<![a-z])'+re.escape(x)+r'(?![a-z])',lowered)}
+    return {x for x in SKILLS if re.search(r'(?<!\w)'+re.escape(x)+r'(?!\w)',lowered)}
 
 def score(resume,job):
-    jd=' '.join([job.get('title',''),job.get('description','')]); rt=terms(resume); jt=terms(jd)
+    title=job.get('title') or ''; description=job.get('description') or ''
+    jd=' '.join([title,description]); rt=terms(resume); jt=terms(jd)
     rs=skills_in(resume); js=skills_in(jd)
     overlap=rt&jt; common=rs&js
     keyword_score=len(overlap)/max(1,min(len(jt),45))
     skill_score=(len(common)/len(js)) if js else keyword_score
-    title_terms=terms(job.get('title',''))
+    title_terms=terms(title)
     role_score=len(title_terms&rt)/max(1,len(title_terms))
     value=round(100*(0.50*skill_score+0.32*min(1,keyword_score*1.8)+0.18*role_score))
     return {'match_score':max(0,min(100,value)), 'skills_matched':sorted(common),'skills_missing':sorted(js-rs),'shared_keywords':sorted(overlap)[:18], 'eligibility':'Review required', 'reason':'Similarity ranking only; experience, work authorization and mandatory eligibility must be verified before applying.'}

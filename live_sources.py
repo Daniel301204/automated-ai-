@@ -17,10 +17,18 @@ def location_assessment(location, worldwide=False):
     restricted = ('united states', 'usa', 'us only', 'canada', 'uk only',
                   'united kingdom', 'europe only', 'eu only', 'australia only')
     india = any(re.search(r'(?<![a-z])'+re.escape(x)+r'(?![a-z])',s) for x in INDIA)
+    excludes_india = bool(re.search(r'\b(?:except|excluding|not|outside)\s+(?:candidates?\s+(?:from|in)\s+)?india\b|\bindia\s+(?:excluded|not eligible|not supported|not allowed)\b', s))
+    global_listed = bool(worldwide) or any(x in s for x in ('worldwide','anywhere in the world','globally','global remote'))
+    other_region = any(x in s for x in restricted)
+    only_other = bool(re.search(r'\b(?:us|usa|uk|eu|europe|canada|australia|united states|united kingdom)\s+only\b', s))
+    if excludes_india:
+        return 'Other region listed'
+    if (global_listed and other_region) or (india and only_other):
+        return 'Eligibility unverified'
     if india: return 'India listed'
-    if worldwide or any(x in s for x in ('worldwide','anywhere in the world','globally','global remote')):
+    if global_listed:
         return 'Worldwide listed'
-    if any(x in s for x in restricted): return 'Other region listed'
+    if other_region: return 'Other region listed'
     return 'Eligibility unverified'
 
 def good_location(location, policy='india_remote', worldwide=False):
@@ -65,7 +73,7 @@ def fetch_public(query, boards=None, session=None, per_source=50, location_polic
         try:
             payload=_get_json(session,'https://remotive.com/api/remote-jobs',{'search':query,'limit':per_source})
             for j in payload.get('jobs',[])[:per_source]:
-                location=j.get('candidate_required_location','Worldwide remote')
+                location=j.get('candidate_required_location') or 'Location not provided'
                 if good_location(location,location_policy):
                     url=j.get('url','')
                     if str(url).startswith('https://'):

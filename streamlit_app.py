@@ -34,7 +34,23 @@ if local:
 else:
     if not secret('auth') or not secret('database_url'):
         st.title('LoopingCV setup')
-        st.info('The owner must configure sign-in and PostgreSQL in Streamlit secrets before this app can accept résumés. See DEPLOYMENT.md.')
+        st.info('The app is running. Complete the private hosting configuration before users sign in or upload résumés.')
+        st.write('**Required configuration**')
+        st.write('Google sign-in settings: ' + ('present' if secret('auth') else 'missing [auth] section'))
+        st.write('PostgreSQL storage: ' + ('present' if secret('database_url') else 'missing database_url'))
+        st.write('1. Open your Streamlit app settings → Secrets.')
+        st.write('2. Create a managed PostgreSQL database and a Google OAuth Web application client.')
+        st.write('3. Copy the secrets template, replace its placeholders privately, save and restart the app.')
+        st.caption('Google callbacks use your actual public app URL: /oauth2callback for sign-in and / for Gmail. Each friend has a separate account. Gmail sending needs additional OAuth/encryption settings and approval for every message.')
+        public_origin = public_share_url(st.context.url)
+        if public_origin:
+            st.write('**Google callback addresses for this app**')
+            st.code('Sign-in: ' + public_origin + 'oauth2callback\nGmail: ' + public_origin, language=None)
+            template = (ROOT / '.streamlit' / 'secrets.example.toml').read_text().replace('https://YOUR_APP.streamlit.app', public_origin.rstrip('/'))
+            st.download_button('Download secrets template for this app', template, 'loopingcv-secrets-template.toml', 'text/plain')
+        guide = 'https://github.com/Daniel301204/automated-ai-/blob/codex/approval-gated-streamlit/'
+        st.link_button('Open simple hosting checklist', guide + 'CAPSTONE_LAUNCH.md')
+        st.link_button('Open secrets template', guide + '.streamlit/secrets.example.toml')
         st.stop()
     if not st.user.is_logged_in:
         st.title('Sign in to your private job workspace')

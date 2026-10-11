@@ -18,10 +18,12 @@ from resume_match import skills_in
 
 def evidence_profile(text):
     lines = [line.strip() for line in text.splitlines() if line.strip()]
+    education = r'\b(degree|bachelor|master|university|college|b[.\s-]?sc|m[.\s-]?sc|mba|phd|b[.\s-]?tech|m[.\s-]?tech|b[.\s-]?com|m[.\s-]?com|bba|bca|mca|pgdm)\b'
+    experience = r'\b(experience|worked|analyst|engineer|intern(?:ship)?|manager|developer|consultant|scientist|designer|researcher)\b'
     return {
         'skills': sorted(skills_in(text)),
-        'education_evidence': [s for s in lines if re.search(r'\b(degree|bachelor|master|university|college|bsc|msc|mba|phd)\b', s, re.I)],
-        'experience_evidence': [s for s in lines if re.search(r'\b(experience|worked|analyst|engineer|intern|manager|20\d{2})\b', s, re.I)],
+        'education_evidence': [s for s in lines if re.search(education, s, re.I)],
+        'experience_evidence': [s for s in lines if re.search(experience, s, re.I)],
         'preferences': 'Enter your preferences; they cannot be inferred reliably from a résumé.',
     }
 

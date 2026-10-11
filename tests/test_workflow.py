@@ -336,3 +336,68 @@ def test_loop_threshold_is_checked_again_at_dispatch(store):
     with pytest.raises(ValueError, match='threshold'):
         store.send_approved('alice', 'job1', digest, {}, sender=sender)
     sender.assert_not_called()
+
+
+def test_docx_resume_includes_tables_in_document_order():
+    import io
+    from docx import Document
+    from resume_match import read_resume
+    document = Document()
+    document.add_paragraph('Candidate résumé')
+    table = document.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = 'Python and SQL'
+    table.cell(0, 1).text = 'MSc at Example University'
+    table.cell(1, 0).merge(table.cell(1, 1)).text = 'Intern at Example, 2024'
+    document.add_paragraph('End of résumé')
+    raw = io.BytesIO()
+    document.save(raw)
+    extracted = read_resume('resume.docx', raw.getvalue())
+    assert extracted.splitlines() == ['Candidate résumé', 'Python and SQL', 'MSc at Example University', 'Intern at Example, 2024', 'End of résumé']
+    profile = evidence_profile(extracted)
+    assert profile['skills'] == ['python', 'sql']
+    assert profile['education_evidence'] == ['MSc at Example University']
+
+
+@pytest.mark.parametrize('location,worldwide,expected', [
+    ('Worldwide remote, US only', False, 'Eligibility unverified'),
+    ('Canada', True, 'Eligibility unverified'),
+    ('Worldwide except India', False, 'Other region listed'),
+    ('India not eligible', False, 'Other region listed'),
+    ('Remote, India, US only', False, 'Eligibility unverified'),
+    ('India or United States', False, 'India listed'),
+    ('Worldwide remote', False, 'Worldwide listed'),
+])
+def test_location_metadata_does_not_override_restrictions(location, worldwide, expected):
+    assert location_assessment(location, worldwide) == expected
+
+
+def test_missing_feed_location_is_not_invented_as_worldwide():
+    session, response = Mock(), Mock()
+    response.json.return_value = {'jobs': [dict(id='missing-location', title='Python developer', company_name='Example', url='https://example.org/job', description='Python') ]}
+    session.get.return_value = response
+    jobs, errors = fetch_public('python', session=session, enabled_sources=['Remotive'])
+    assert jobs == [] and errors == []
+    jobs, errors = fetch_public('python', session=session, enabled_sources=['Remotive'], location_policy='all')
+    assert len(jobs) == 1 and errors == []
+    assert jobs[0]['location'] == 'Location not provided'
+    assert jobs[0]['location_status'] == 'Eligibility unverified'
+
+
+def test_matching_tolerates_null_optional_provider_fields():
+    from resume_match import score
+    match = score('Python and SQL', {'title': 'Developer', 'description': None})
+    assert 0 <= match['match_score'] <= 100
+    assert match['eligibility'] == 'Review required'
+
+
+def test_indian_degree_evidence_does_not_become_work_experience():
+    profile = evidence_profile('B.Tech Computer Science, Example Institute, 2024\nMCA, Example College\nDeveloper internship, Example Company, 2025')
+    assert profile['education_evidence'] == ['B.Tech Computer Science, Example Institute, 2024', 'MCA, Example College']
+    assert profile['experience_evidence'] == ['Developer internship, Example Company, 2025']
+    assert 'experience_years' not in profile
+
+
+def test_accented_resume_text_does_not_invent_r_programming():
+    from resume_match import skills_in
+    assert skills_in('My résumé: Python and SQL') == {'python', 'sql'}
+    assert skills_in('R programming; Python; SQL') == {'r', 'python', 'sql'}

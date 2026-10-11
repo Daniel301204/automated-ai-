@@ -1,0 +1,2 @@
+# Optional presentation generation; not needed by the Streamlit application.
+python-pptx==1.0.2

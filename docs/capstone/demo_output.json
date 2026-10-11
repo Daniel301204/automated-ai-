@@ -1,0 +1,45 @@
+{
+  "notice": "Fictional demo data. The score is text similarity, not measured accuracy or verified eligibility. No application is created or sent.",
+  "profile_evidence": {
+    "skills": [
+      "git",
+      "python",
+      "sql",
+      "streamlit"
+    ],
+    "education_evidence": [
+      "B.Tech Computer Science, Example Institute, 2024"
+    ],
+    "experience_evidence": [
+      "Developer internship at Example Company, 2025"
+    ],
+    "preferences": "Enter your preferences; they cannot be inferred reliably from a résumé."
+  },
+  "demo_job": {
+    "title": "Python Developer",
+    "description": "Python developer using SQL, Streamlit, Git and Docker.",
+    "location": "India",
+    "source": "Synthetic demonstration; not an actual vacancy"
+  },
+  "matching_output": {
+    "match_score": 90,
+    "skills_matched": [
+      "git",
+      "python",
+      "sql",
+      "streamlit"
+    ],
+    "skills_missing": [
+      "docker"
+    ],
+    "shared_keywords": [
+      "developer",
+      "git",
+      "python",
+      "sql",
+      "streamlit"
+    ],
+    "eligibility": "Review required",
+    "reason": "Similarity ranking only; experience, work authorization and mandatory eligibility must be verified before applying."
+  }
+}
