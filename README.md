@@ -18,12 +18,15 @@ To view and develop the dashboard on your own computer, follow [LOCAL_RUN.md](LO
 
 ## LoopingCV interface
 
-The dashboard follows the supplied LoopCV screenshots: a white sidebar, blue controls, light workspace, Personal Info tabs and a four-step New Loop wizard (Search Info → Email Template → Settings → Review). Saved loops contain actual per-user searches, source choices, templates and limits. Radius/hybrid filters, billing and automatic answering are visibly unavailable rather than simulated.
+The dashboard follows the supplied LoopCV screenshots: a white sidebar, blue controls, light workspace, Overview checklist and five activity cards, Personal Info tabs with outlined fields, and a four-step New Loop wizard (Search Info → Email Template → Settings → Review). The dashboard opens on Overview. Matches use job cards and the Board groups actual records into five application stages. Saved loops contain actual per-user searches, source choices, templates and limits. Radius/hybrid filters, billing and automatic answering are visibly unavailable rather than simulated.
 
-Desktop previews use unsaved example data:
+Desktop previews show a fresh local workspace, without personal data:
 
+- [Overview](docs/ui/overview.png)
 - [New Loop](docs/ui/new-loop.png)
 - [Personal Info](docs/ui/personal-info.png)
+
+The Overview uses actual stored records. Total Matches is recalculated against the current résumé and both match thresholds. Emails Sent includes only confirmed Gmail message IDs; uncertain attempts remain pending. Setup actions open the corresponding working pages. The fourth screenshot-reference shortcut is replaced by résumé upload because no browser extension is implemented. See [the redesign notes](docs/UI_REDESIGN.md).
 
 The existing `AUTOJOB_` development variables and `autojob_` database table names are retained for compatibility. Never enable local development mode on a public host.
 

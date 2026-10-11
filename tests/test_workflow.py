@@ -261,6 +261,7 @@ def test_loop_wizard_saves_real_private_configuration(monkeypatch, tmp_path):
     monkeypatch.setenv('AUTOJOB_DATABASE_URL', url)
     from streamlit.testing.v1 import AppTest
     app = AppTest.from_file(Path(__file__).resolve().parents[1] / 'streamlit_app.py').run(timeout=20)
+    app.button(key='header_new').click().run()
     def field(kind, label):
         return next(w for w in getattr(app, kind) if w.label == label)
     field('button', 'Continue').click().run()

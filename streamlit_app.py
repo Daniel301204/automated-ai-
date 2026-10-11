@@ -12,7 +12,8 @@ from live_sources import fetch_public
 from resume_match import read_resume, score
 from workflow import Store, evidence_profile, approval_digest
 from loops import SOURCES, LOCATIONS, SUBJECT, BODY, normalize_loop, validate_template, email_preview, discover_loop
-from looping_ui import theme, sidebar, header, stepper, empty, go, public_share_url
+from looping_ui import (theme, sidebar, header, stepper, empty, go, public_share_url,
+    description, status_badge, job_heading, skill_chips, dashboard_counts, overview_cards, setup_item, greeting)
 
 st.set_page_config(page_title='LoopingCV', page_icon='↻', layout='wide')
 theme()
@@ -105,11 +106,11 @@ if not local and secret('gmail_oauth') and secret('token_encryption_key'):
     except Exception:
         st.error('Gmail connection configuration is unavailable. Email sending is disabled.')
 
-st.session_state.setdefault('active_page', 'New Loop')
+st.session_state.setdefault('active_page', 'Overview')
 auth_settings = secret('auth', {}) if not local else {}
 sidebar(public_share_url(auth_settings.get('redirect_uri')))
 page = st.session_state.active_page
-header(page, local)
+header(page, local, profile.get('name', ''))
 if not local and st.sidebar.button('Sign out'):
     st.session_state.clear()
     st.logout()
@@ -240,25 +241,27 @@ if page == 'New Loop':
                 st.rerun()
 
 elif page == 'Overview':
-    st.title('Your job search, in one place')
     rows = store.list_jobs(tenant)
     saved_loops = store.list_loops(tenant)
-    columns = st.columns(4)
-    for column, label, value in zip(columns, ['My loops', 'Jobs found', 'Awaiting response', 'Interviews'], [len(saved_loops), len(rows), sum(r['status']=='awaiting_response' for r in rows), sum(r['status']=='interview' for r in rows)]):
-        column.metric(label, value)
-    with st.container(key='content_card'):
-        st.subheader('Make your next move')
-        st.write('Create a loop for the role you want. Review real matches, verify the vacancy and approve each application.')
-        a,b,c = st.columns(3)
-        a.button('Create a new loop', on_click=go, args=('New Loop',), type='primary')
-        b.button('Upload or check my CV', on_click=go, args=('CV Checker',))
-        c.button('Review my applications', on_click=go, args=('My Applications',))
-    if not rows:
-        empty('Your journey starts with a loop', 'No invented matches or activity. Your real job search results will appear here.')
-    st.caption('Scheduled searches require the owner to enable the external scheduler. Applications always require your approval.')
+    st.subheader('You’re almost there!' if not (profile.get('name') and user['resume_text'] and saved_loops) else 'Your workspace is ready')
+    with st.container(key='setup_panel'):
+        setup_item('Setup profile', 'person', bool(profile.get('name')), 'Personal Info', 'profile')
+        setup_item('Answer questions', 'questions', bool(profile.get('answers')), 'Questions', 'answers')
+        setup_item('Start first loop', 'loop', bool(saved_loops), 'New Loop', 'loop')
+        setup_item('Upload your CV', 'document', bool(user['resume_text']), 'CV Checker', 'cv')
+    greeting(profile.get('first_name') or profile.get('name', '').split(' ', 1)[0])
+    overview_cards(dashboard_counts(rows, saved_loops, user['resume_text'], profile.get('threshold', 80)))
+    st.caption('Counts reflect your saved activity. Scheduled discovery needs the external scheduler; every email requires your approval.')
+    if rows:
+        with st.expander('Recent saved jobs'):
+            for row in rows[-5:][::-1]:
+                job_heading(json.loads(row['payload']))
+                status_badge(row['status'])
+            st.button('Review applications', on_click=go, args=('My Applications',))
 
 elif page == 'My loops':
     st.title('My loops')
+    description('Organize your searches by role, location and application preferences.')
     saved_loops = store.list_loops(tenant)
     if not saved_loops:
         empty('Create your first loop', 'Save a job title, location and email template to organize your search.')
@@ -266,9 +269,14 @@ elif page == 'My loops':
     for row in saved_loops:
         config = json.loads(row['config'])
         with st.container(border=True):
-            st.subheader(config['name'])
+            title_col, status_col = st.columns([4,1])
+            title_col.subheader(config['name'])
+            with status_col:
+                status_badge('active' if row['enabled'] else 'paused')
             st.caption(config['query'] + ' · ' + config['location'] + ' · ' + ', '.join(config['sources']))
-            st.write('Scheduled discovery: ' + ('Enabled · external scheduler required' if row['enabled'] else 'Paused'))
+            st.caption('Match threshold: ' + str(config['threshold']) + '% · Daily email limit: ' + str(config['daily_limit']) + ' · Your approval required')
+            if row['enabled']:
+                st.caption('Scheduled discovery is enabled for the external scheduler.')
             run_col, pause_col, edit_col = st.columns(3)
             if run_col.button('Find matches now', key='run_loop_' + row['loop_id'], type='primary', disabled=not bool(user['resume_text'])):
                 run_search(config, row['loop_id'])
@@ -290,7 +298,7 @@ elif page == 'Personal Info':
         with personal:
             with st.container(key='personal_form'):
                 with st.form('personal_info'):
-                    st.text_input('Email', st.user.get('email','') if not local else '', disabled=True, placeholder='Your verified sign-in email')
+                    st.text_input('Email', st.user.get('email','') if not local else '', disabled=True, placeholder='No sign-in required in local mode' if local else 'Your verified sign-in email')
                     pieces = profile.get('name', '').split(' ', 1)
                     first = st.text_input('First Name', profile.get('first_name', pieces[0] if pieces else ''))
                     last = st.text_input('Last Name', profile.get('last_name', pieces[1] if len(pieces)>1 else ''))
@@ -322,7 +330,7 @@ elif page == 'Personal Info':
                     gmail_connections.disconnect(tenant)
                     st.rerun()
             else:
-                st.info('Gmail connection is not configured. The owner must add Google OAuth settings before users can connect.')
+                st.info('Email sending is disabled in local preview. Gmail can be connected in the authenticated hosted version.' if local else 'Gmail connection is not configured. The owner must add Google OAuth settings before users can connect.')
         with questions:
             st.write('Save only truthful answers you have checked. These are reference notes, not automatically submitted answers.')
             answers = st.text_area('My verified application answers', profile.get('answers',''), height=180)
@@ -336,7 +344,17 @@ elif page == 'Personal Info':
             st.info('View confirmed application activity in My Applications and Inbox. Automated inbox synchronization is not enabled.')
 
 elif page == 'Questions':
-    st.title('Questions & help')
+    st.title('Questions')
+    description('Keep your verified application answers ready, and find help with your job search.')
+    with st.container(key='content_card'):
+        st.subheader('Your application answers')
+        st.caption('Reference notes only. Save truthful answers supported by your documents; they are not automatically submitted.')
+        answers = st.text_area('My verified application answers', profile.get('answers',''), height=180, key='questions_answers')
+        if st.button('Save answers', type='primary', key='questions_save'):
+            profile['answers'] = answers
+            store.save_profile(tenant, profile=json.dumps(profile))
+            st.success('Saved privately')
+    st.subheader('Frequently asked questions')
     for question, answer in [('Will a loop send applications automatically?', 'No. Scheduled discovery only finds jobs. You verify eligibility and contact information, then explicitly approve each email.'), ('Does a match score prove I am eligible?', 'No. The score compares résumé keywords. Review all mandatory qualifications, location and work authorization.'), ('Can LoopingCV submit ATS forms?', 'No authorized ATS adapters are configured. Complete the employer application yourself and record its status.'), ('Why are radius and hybrid filters disabled?', 'The public feeds do not provide consistent distance coordinates or hybrid eligibility.'), ('Are my details shared with other users?', 'Your profile, CV, loops, jobs and Gmail connection belong to your signed-in account.'), ('Why is an email marked delivery_unknown?', 'Gmail did not confirm the result. Check your Gmail Sent folder; the app blocks retries to avoid duplicate applications.')]:
         with st.expander(question):
             st.write(answer)
@@ -344,6 +362,7 @@ elif page == 'Questions':
 
 elif page == 'CV Builder':
     st.title('CV Builder')
+    description('Review and refine your résumé using your own verified experience.')
     with st.container(key='content_card'):
         st.subheader('Build from your verified evidence')
         st.caption('This editor does not invent qualifications or experience. It exports plain text; email applications require your reviewed original PDF.')
@@ -361,31 +380,55 @@ elif page == 'CV Builder':
 
 elif page == 'Inbox':
     st.title('Inbox')
-    st.info('Gmail reply synchronization is not implemented. This page shows confirmed dispatch activity, not invented employer replies.')
+    description('Your recorded email application activity, in one place.')
+    st.info('View employer replies in Gmail. Automatic reply synchronization is unavailable; this page shows recorded send attempts.')
     sent = [r for r in store.list_jobs(tenant) if r['reserved_day']]
     if not sent:
         empty('No dispatched applications yet', 'Emails appear here after you approve a send attempt.')
     for row in sent:
         job = json.loads(row['payload'])
         with st.container(border=True):
-            st.write('**'+job['title']+'** · '+job['company'])
-            st.caption(row['status'].replace('_',' ').title() + ' · ' + row['reserved_day'])
+            job_heading(job)
+            status_badge(row['status'])
+            st.caption('Attempt date (UTC): ' + row['reserved_day'])
             if row['message_id']:
                 st.write('Gmail message ID:', row['message_id'])
     st.link_button('Open Gmail', 'https://mail.google.com/')
 
 elif page == 'CV Checker':
     st.title('CV Checker')
-    upload = st.file_uploader('Upload PDF, DOCX or TXT', type=['pdf', 'docx', 'txt'])
-    if upload and st.button('Save résumé'):
-        try:
-            upload_resume(upload)
-            user = store.profile(tenant)
-        except Exception as exc:
-            st.error(str(exc))
+    description('Upload once, check what was extracted and keep your résumé ready for applications.')
+    with st.container(key='cv_upload'):
+        st.subheader('Your résumé')
+        st.caption('PDF, DOCX or TXT · Up to 6 MB · Scanned PDFs require OCR, which is unavailable.')
+        upload = st.file_uploader('Upload PDF, DOCX or TXT', type=['pdf', 'docx', 'txt'])
+        if upload and st.button('Save résumé', type='primary'):
+            try:
+                upload_resume(upload)
+                user = store.profile(tenant)
+            except Exception as exc:
+                st.error(str(exc))
     if user['resume_text']:
-        st.caption('Evidence extraction uses literal résumé lines. It does not invent education, duration of experience or preferences.')
-        st.json(evidence_profile(user['resume_text']))
+        evidence = evidence_profile(user['resume_text'])
+        st.subheader('Skills found in your résumé')
+        if evidence['skills']:
+            skill_chips(evidence['skills'])
+        else:
+            st.caption('No predefined skills found. You can still use résumé keywords for matching.')
+        education, experience = st.columns(2)
+        with education, st.container(border=True):
+            st.subheader('Education evidence')
+            for line in evidence['education_evidence']:
+                st.write(line)
+            if not evidence['education_evidence']:
+                st.caption('No education lines identified. Check your original résumé.')
+        with experience, st.container(border=True):
+            st.subheader('Experience evidence')
+            for line in evidence['experience_evidence']:
+                st.write(line)
+            if not evidence['experience_evidence']:
+                st.caption('No experience lines identified. Check your original résumé.')
+        st.caption('These are literal résumé lines. Confirm accuracy against your original document.')
         text = st.text_area('Review extracted text', user['resume_text'], height=300)
         if st.button('Save corrected text'):
             store.save_profile(tenant, resume_text=text)
@@ -397,18 +440,24 @@ elif page == 'CV Checker':
 
 elif page in ('Search Jobs', 'All Matches'):
     st.title(page)
+    description('Discover real vacancies and review how their requirements compare with your résumé.' if page == 'Search Jobs' else 'Review vacancies that meet your loop and account match thresholds.')
     if not user['resume_text']:
         st.info('Upload your résumé on CV Checker first.')
     saved_loops = store.list_loops(tenant)
     loop_options = {'quick': 'Quick search'}
     loop_options.update({r['loop_id']: json.loads(r['config'])['name'] for r in saved_loops})
-    selected = st.selectbox('Search loop', list(loop_options), format_func=loop_options.get)
-    selected_config = next((json.loads(r['config']) for r in saved_loops if r['loop_id']==selected), None)
-    query = st.text_input('Job title or keyword', selected_config['query'] if selected_config else profile.get('query', ''), placeholder='Software Engineer', key='query_' + selected)
-    if st.button('Find jobs', disabled=not bool(user['resume_text']), type='primary'):
-        config = dict(selected_config or dict(location=LOCATIONS[0], sources=SOURCES, threshold=80, daily_limit=3, boards=profile.get('boards',{}), subject=SUBJECT, body=BODY))
-        config['query'] = query
-        run_search(config, None if selected=='quick' else selected)
+    with st.container(key='search_controls'):
+        source_col, query_col, action_col = st.columns([2,3,1])
+        with source_col:
+            selected = st.selectbox('Search loop', list(loop_options), format_func=loop_options.get)
+        selected_config = next((json.loads(r['config']) for r in saved_loops if r['loop_id']==selected), None)
+        with query_col:
+            query = st.text_input('Job title or keyword', selected_config['query'] if selected_config else profile.get('query', ''), placeholder='Software Engineer', key='query_' + selected)
+        with action_col:
+            if st.button('Find jobs', disabled=not bool(user['resume_text']), type='primary', use_container_width=True):
+                config = dict(selected_config or dict(location=LOCATIONS[0], sources=SOURCES, threshold=80, daily_limit=3, boards=profile.get('boards',{}), subject=SUBJECT, body=BODY))
+                config['query'] = query
+                run_search(config, None if selected=='quick' else selected)
     for error in st.session_state.get('feed_errors', []):
         st.warning(error)
     jobs = st.session_state.get('found_jobs')
@@ -419,21 +468,30 @@ elif page in ('Search Jobs', 'All Matches'):
     if page == 'All Matches':
         jobs = [j for j in jobs if j.get('match_score',0) >= max(int(j.get('loop_threshold',80)), int(profile.get('threshold',80)))]
     st.caption(f'{len(jobs)} listings retrieved. An empty result does not prove there are no vacancies.')
+    if not jobs:
+        empty('Your matches will appear here', 'Choose a job title and run a search after uploading your résumé.')
     for job in jobs[:100]:
-        with st.expander(f"{job['title']} · {job['company']} · {job['match_score']}%"):
-            st.write(job['location'])
-            st.link_button('Original vacancy / employer application', job['url'])
-            st.write(job['description'])
-            st.write('Skills matched:', ', '.join(job['skills_matched']))
-            st.write('Skills missing from résumé:', ', '.join(job['skills_missing']))
-            st.caption(job['reason'])
-            if st.button('Save job', key='save_' + job['job_id']):
+        with st.container(border=True):
+            details, rating = st.columns([4,1])
+            with details:
+                job_heading(job)
+                skill_chips(job['skills_matched'])
+            with rating:
+                st.metric('Match', str(job['match_score']) + '%')
+            with st.expander('View requirements and match details'):
+                st.write(job['description'])
+                st.write('Skills missing from résumé:', ', '.join(job['skills_missing']))
+                st.caption(job['reason'])
+            employer, save = st.columns([4,1])
+            employer.link_button('Original vacancy / employer application', job['url'])
+            if save.button('Save job', key='save_' + job['job_id']):
                 store.track(tenant, job['job_id'], 'saved')
                 st.success('Saved')
     st.info('Review saved jobs on My Applications. Verify mandatory requirements and the original employer contact before preparing an email.')
 
 elif page == 'My Applications':
-    st.title('Review each application')
+    st.title('My Applications')
+    description('Verify the vacancy, review your message and approve each application yourself.')
     st.warning('No ATS submission adapter is installed. Use the original employer page and record submission only after you have completed it.')
     review_rows = store.list_jobs(tenant)
     if not review_rows:
@@ -445,6 +503,8 @@ elif page == 'My Applications':
         job = json.loads(row['payload'])
         job.update(score(user['resume_text'] or '', job))
         with st.expander(f"{job['title']} · {job['company']} · {row['status']}"):
+            job_heading(job)
+            status_badge(row['status'])
             st.link_button('Verify vacancy / apply on employer site', job['url'])
             st.write(job['description'])
             if row['status'] in ('sending', 'delivery_unknown') or row['reserved_day']:
@@ -511,12 +571,27 @@ elif page == 'My Applications':
 
 else:
     st.title('Board')
+    description('Follow your applications from review to employer response.')
     rows = store.list_jobs(tenant)
     if not rows:
         st.info('Find jobs to start your tracker.')
     else:
         records = [dict(title=json.loads(r['payload'])['title'], company=json.loads(r['payload'])['company'], status=r['status'], gmail_message_id=r['message_id'] or '') for r in rows]
-        st.dataframe(pd.DataFrame(records), hide_index=True)
+        stages = [('Needs review', ('discovered','saved','needs_review','sending','delivery_unknown')), ('Submitted', ('submitted',)), ('Awaiting response', ('awaiting_response',)), ('Interview', ('interview',)), ('Rejected', ('rejected',))]
+        with st.container(key='board_columns'):
+            for column, (label, statuses) in zip(st.columns(5), stages):
+                with column:
+                    group = [row for row in rows if row['status'] in statuses]
+                    import html
+                    st.markdown('<div class="lc-board-label">' + html.escape(label) + '<span class="lc-board-count">' + str(len(group)) + '</span></div>', unsafe_allow_html=True)
+                    if not group:
+                        st.caption('No applications')
+                    for row in group:
+                        with st.container(border=True):
+                            job_heading(json.loads(row['payload']))
+                            status_badge(row['status'])
+        with st.expander('All application records'):
+            st.dataframe(pd.DataFrame(records), hide_index=True, use_container_width=True)
         st.download_button('Export tracking CSV', pd.DataFrame(records).to_csv(index=False).encode(), 'applications.csv')
         st.caption('Gmail acceptance is recorded automatically. Interviews, rejections and external ATS submissions must be confirmed manually; inbox synchronization is not implemented.')
         choices = {r['job_id']: json.loads(r['payload'])['title'] + ' · ' + json.loads(r['payload'])['company'] for r in rows}

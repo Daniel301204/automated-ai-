@@ -9,6 +9,10 @@ This is the source code for the LoopingCV interface and job review workflow. Loc
 3. Double-click **RUN_LOOPINGCV.bat**. The first run installs the dependencies and needs an internet connection. Keep the console window open.
 4. Open **http://localhost:8502** in your browser if it does not open automatically.
 
+The updated interface opens on **Overview**, with the setup checklist and five activity cards from the supplied design references. No Google or Neon setup is needed for this private local workspace.
+
+When upgrading from your backup release, stop the old server and extract the complete new ZIP into a separate folder. Keep your backup intact. Do not copy its `.venv` into the new folder: NumPy extensions built for Python 3.14 cannot be imported by Python 3.12. The launcher creates a fresh Python 3.12 environment. The new folder starts a separate workspace; your earlier local data stays in the backup. If you reuse this version's source folder, keep its existing `data/development.db` and private configuration files.
+
 You can also open PowerShell in the extracted folder and run:
 
 ```powershell
@@ -56,6 +60,7 @@ python3.12 -m venv .venv
 - **Python 3.12 missing:** install it, close the console and run the launcher again.
 - **Port 8502 already in use:** stop your previous LoopingCV console with Ctrl+C before starting again.
 - **Dependency download failed:** check the displayed error and internet connection, then retry.
+- **NumPy C-extension error mentioning cp314 with Python 3.12:** stop Streamlit and rename the copied `.venv` to a backup name, then rerun `RUN_LOOPINGCV.bat` to create a compatible environment. Do not copy virtual environments between releases or Python versions.
 - **Setup screen instead of the dashboard:** use `RUN_LOOPINGCV.bat` or `run_local.py`; running `streamlit_app.py` directly does not enable local mode.
 - **No jobs:** try a broader title and another supported source. Never treat an empty feed or a feed failure as a successful application.
 
